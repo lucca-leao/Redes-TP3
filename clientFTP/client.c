@@ -31,14 +31,33 @@ void create_packet(int seqnum, char checksum, char* dados, char* packet){
 
 }
 
+char checksum(char* s, int total_lido ){
+	char sum = 1;
+	int i = 0;
+
+	while (i < total_lido)
+	{	
+		sum += *s;
+		s++;
+		i++;
+	}
+	return sum;
+}
+
 void create_seqnum_pkg(int seqnum, char *seqnum_pkg){
 	unsigned char seqnum_bytes[4];
 	seqnum_bytes[3] = (seqnum >> 24) & 0xFF;
 	seqnum_bytes[2] = (seqnum >> 16) & 0xFF;
 	seqnum_bytes[1] = (seqnum >> 8) & 0xFF;
 	seqnum_bytes[0] = seqnum & 0xFF;
-
+	char sum;
+	sum = checksum(seqnum_bytes, 4);
+	
 	memmove(seqnum_pkg, seqnum_bytes, 4);
+	seqnum_pkg[4] = sum;
+
+	printf("Seqnum no pacote *(int*) %d\n",*(int*)seqnum_bytes );
+
 }
 
 void extract_packet(char* packet, int seqnum_recebido, char* dados, int total_recebido ){
@@ -78,18 +97,6 @@ int bytes_to_write(int total_recebido, int tam_cabecalho){
 	return write_n;
 }
 
-char checksum(char* s, int total_lido ){
-	char sum = 1;
-	int i = 0;
-
-	while (i < total_lido)
-	{	
-		sum += *s;
-		s++;
-		i++;
-	}
-	return sum;
-}
 
 char extract_checksum(char* packet){
 	return packet[4];
@@ -145,7 +152,7 @@ int main(int argc, char **argv){
 	int N = 3;
 	int seqnum_recebido = 1;
 	int expected_seqnum = 2;
-	char seqnum_pkg[4] = { 0 };
+	char seqnum_pkg[5] = { 0 };
 
 	// INICIALIZANDO TP SOCKET
 	tp_init();
@@ -177,9 +184,6 @@ int main(int argc, char **argv){
 	char sum_recebido = '\0';
 	sum = checksum(nome_do_arquivo, strlen(nome_do_arquivo));
 
-	create_packet(seqnum, sum, nome_do_arquivo, nome_do_arquivo_pkg);
-	printf("Pacote com nome do arquivo %s \n", nome_do_arquivo_pkg);
-	
 	// REALIZA TEMPORIZACAO ESPARA 1S
 	struct timeval tv;
 	tv.tv_sec = 1;
@@ -197,11 +201,12 @@ int main(int argc, char **argv){
 		//printf("Envia nome_do_arquivo ......\n");
 		printf("Checksum %c, in package %c \n", sum, nome_do_arquivo_pkg[4]);
 		printf("Nome do arquivo, strlen, %s, %zu \n", nome_do_arquivo, strlen(nome_do_arquivo));
+		create_packet(seqnum, sum, nome_do_arquivo, nome_do_arquivo_pkg);
 		tp_sendto(udp_socket, nome_do_arquivo_pkg, strlen(nome_do_arquivo)+tam_cabecalho+1, &server);
 		total_recebido = tp_recvfrom(udp_socket, buffer, tam_buffer, &server);  // Esperando seqnum = 0
 		seqnum_recebido = extract_seqnum(buffer);
 		printf("seqnum_recebido %d \n", seqnum_recebido);
-	}while ((total_recebido == -1) || seqnum_recebido != 2);
+	}while ((total_recebido == -1) || seqnum_recebido != 1);
 	printf("OK, server recebeu o nome do arquivo !\n");
 
 	// CONFIRMA INICIO DA CONEXÃO
@@ -234,6 +239,7 @@ int main(int argc, char **argv){
 					extract_packet(buffer, seqnum_recebido, dados, total_recebido);
 					//printf("Antes de  sum\n");
 					sum = checksum(dados, total_recebido-tam_cabecalho);
+					printf("checksum:%c\n", sum);
 					printf("Buffer recebido: %s \n", buffer);
 					printf("seqnum_recebido %d \n", seqnum_recebido);
 					printf("seqnum_esperado %d \n", expected_seqnum);
@@ -247,7 +253,7 @@ int main(int argc, char **argv){
 					timeouts = 0;
 				}
 				else{
-					create_seqnum_pkg(seqnum_recebido, seqnum_pkg); // Cria seq
+					create_seqnum_pkg(expected_seqnum-1, seqnum_pkg); // Cria seq
 					tp_sendto(udp_socket, seqnum_pkg, sizeof(seqnum_pkg), &server); // Manda seq = 2
 					timeouts++;
 				}
