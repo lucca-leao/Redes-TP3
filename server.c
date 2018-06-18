@@ -94,9 +94,9 @@ int main(int argc, char * argv[]){
 	int seqnum = 0;
 	int seqnum_recebido;
 	int N = 1;
-	int base = 2;
-	int next_seqnum = 2;
-	char seqnum_pkg[4] = { 0 };
+	int base = 1;
+	int next_seqnum = 1;
+	char seqnum_pkg[5] = { 0 };
 	int tam_cabecalho = 5;
 	char *buffer = calloc(tam_buffer, sizeof (*buffer));
 
@@ -178,12 +178,17 @@ int main(int argc, char * argv[]){
 			if (count > 0){
 				seqnum_recebido = extract_seqnum(seqnum_pkg);
 				printf("Recebido seqnum %d \n", seqnum_recebido);
-				base = seqnum_recebido + 1;
-				printf("Base, %d next_seqnum %d \n", base, next_seqnum);
+				sum_recebido = extract_checksum(seqnum_pkg);
+				sum = checksum(seqnum_pkg, 4);
+				printf("checksum_recebido:%c\nchecksum calculado:%c\n%d\n", sum_recebido, sum, sum_recebido==sum);
+				if(sum == sum_recebido){
+					printf("seq recebido:%d",seqnum_recebido);
+					base = seqnum_recebido + 1;
+					printf("Base, %d next_seqnum %d \n", base, next_seqnum);
+				}
 			}
 		} while(base == next_seqnum);
 		next_seqnum ++;
-
 		memset(buffer, 0, tam_buffer);
 		memset(dados, 0, tam_dados);
 		memset(seqnum_pkg, 0, 4);
